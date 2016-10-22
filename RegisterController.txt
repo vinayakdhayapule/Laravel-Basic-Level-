@@ -1,0 +1,90 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Role;
+use Cartalyst\Sentinel\Native\Facades\Sentinel;
+use Illuminate\Http\Request;
+
+class RegisterController extends Controller {
+
+	public function getRegister() {
+		$role = Role::all();
+		return view('register', compact('role'));
+	}
+
+	public function doregister(Request $request) {
+		$credentials = ['first_name' => $request->get('firstname'),
+			'last_name' => $request->get('lastname'),
+			'email' => $request->get('email'),
+			'password' => $request->get('password')];
+
+		$user = Sentinel::registerAndActivate($credentials);
+		if ($user) {
+			$role = Sentinel::findRoleByName($request->get('role_name'));
+			$role->users()->attach($user);
+			flash()->success('registred and assign role to user');
+		}
+		flash()->error('not registred successfully');
+		return redirect()->back();
+	}
+
+	public function getlogin() {
+		if ($user = Sentinel::check()) {
+			return "logged in";
+		}
+		return view('login');
+	}
+
+	public function dologin(Request $request) {
+		if ($request->has('remember')) {
+			$user = Sentinel::authenticateAndRemember(['email' => $request->get('email'), 'password' => $request->get('password')]);
+		} else {
+			$user = Sentinel::authenticate(['email' => $request->get('email'), 'password' => $request->get('password')]);
+		}
+		if ($user) {
+			Sentinel::login($user);
+			if (session('return_url') && session('type')) {
+				new \App\Repository\CommentDisplay(session('type'));
+				return redirect()->to(session('return_url'));
+			}
+			return redirect()->route('welcome');
+		}
+		flash()->error('some error has been occured');
+		return redirect()->back();
+	}
+
+	// public function dologin(Request $request){
+	// if ($request->has('remember')) {
+	//         $user = Sentinel::authenticateAndRemember(['email' => $request->get('email'), 'password' => $request->get('password')]);
+	//     } else {
+	//         $user = Sentinel::authenticate(['email' => $request->get('email'), 'password' => $request->get('password')]);
+	//     }
+	//  if ($user) {
+	//     Sentinel::login($user);
+	//     if(session('current_url'))
+	//     {
+	//     return redirect()->to(session('current_url'));
+	//     }
+	//     return redirect()->route('welcome');
+	//  }
+	//    flash()->error('some error has been occured');
+	//        return redirect()->back();
+	// }
+
+	public function getWelcome() {
+		return view('welcome');
+	}
+
+	public function getLogout() {
+		Sentinel::logout();
+		flash()->success('logout successfully');
+		return redirect()->route('login');
+	}
+
+	public function getProfile() {
+		return view('profile');
+	}
+
+}
